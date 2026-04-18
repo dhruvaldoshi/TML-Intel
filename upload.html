@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TML Intel — Upload</title>
-  <script src="<https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2>"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #080808; color: #ece8df; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; min-height: 100vh; padding: 40px 20px; }
@@ -53,7 +53,7 @@
     .toast.error { border-color: #f87171; color: #f87171; }
   </style>
 </head>
-<body style="display:none">
+<body>
   <div class="container">
     <div class="header">
       <h1>TML Intel</h1>
@@ -63,31 +63,34 @@
       </nav>
       <button class="logout" id="logoutBtn">Sign out</button>
     </div>
-    <div class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" multiple accept=".csv,.xls,.xlsx" />
-      <div class="drop-icon">📂</div>
-      <div class="drop-title">Drop CSV or Excel files here</div>
-      <div class="drop-subtitle">Click to browse · Multiple files supported</div>
-      <div class="file-types">
-        <span class="file-type-tag">CSV</span>
-        <span class="file-type-tag">Excel (.xlsx)</span>
-        <span class="file-type-tag">Excel (.xls)</span>
+    <div id="authMsg" style="display:none; text-align:center; padding:60px; color:#888;">Checking access…</div>
+    <div id="mainContent" style="display:none">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" multiple accept=".csv,.xls,.xlsx" />
+        <div class="drop-icon">📂</div>
+        <div class="drop-title">Drop CSV or Excel files here</div>
+        <div class="drop-subtitle">Click to browse · Multiple files supported</div>
+        <div class="file-types">
+          <span class="file-type-tag">CSV</span>
+          <span class="file-type-tag">Excel (.xlsx)</span>
+          <span class="file-type-tag">Excel (.xls)</span>
+        </div>
       </div>
-    </div>
-    <div id="queueSection" style="display:none">
-      <div class="section-title">Ready to upload</div>
-      <div class="file-list" id="queue"></div>
-      <button class="upload-btn" id="uploadBtn">Upload & Process Files</button>
-    </div>
-    <div class="section-title">Your files</div>
-    <div class="file-list" id="uploadedList">
-      <div class="empty">No files uploaded yet</div>
+      <div id="queueSection" style="display:none">
+        <div class="section-title">Ready to upload</div>
+        <div class="file-list" id="queue"></div>
+        <button class="upload-btn" id="uploadBtn">Upload & Process Files</button>
+      </div>
+      <div class="section-title">Your files</div>
+      <div class="file-list" id="uploadedList">
+        <div class="empty">No files uploaded yet</div>
+      </div>
     </div>
   </div>
   <div class="toast" id="toast"></div>
 
   <script>
-    const SUPABASE_URL = '<https://hwceecnfjvbscosyknyg.supabase.co>';
+    const SUPABASE_URL = 'https://hwceecnfjvbscosyknyg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
     const { createClient } = window.supabase;
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -95,11 +98,14 @@
     let token = null;
     let queue = [];
 
+    document.getElementById('authMsg').style.display = 'block';
+
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
+      document.getElementById('authMsg').style.display = 'none';
       if (!session) { window.location.replace('login.html'); return; }
       token = session.access_token;
-      document.body.style.display = 'block';
+      document.getElementById('mainContent').style.display = 'block';
       loadUploaded();
     })();
 
@@ -147,11 +153,11 @@
             ${['uploading','processing'].includes(item.status) ? `<div class="progress-bar"><div class="progress-fill" style="width:${item.progress}%"></div></div>` : ''}
           </div>
           <div class="file-status status-${item.status}">${{pending:'Ready',uploading:'Uploading…',processing:'Processing…',done:'✓ Done',error:'✗ Error'}[item.status]}</div>
-          ${item.status === 'pending' ? `<button class="remove-btn" onclick="removeItem('${<item.id>}')">×</button>` : ''}
+          ${item.status === 'pending' ? `<button class="remove-btn" onclick="removeItem('${item.id}')">×</button>` : ''}
         </div>`).join('');
     }
 
-    function removeItem(id) { queue = queue.filter(q => <q.id> !== id); renderQueue(); }
+    function removeItem(id) { queue = queue.filter(q => q.id !== id); renderQueue(); }
 
     document.getElementById('uploadBtn').addEventListener('click', async () => {
       document.getElementById('uploadBtn').disabled = true;
@@ -170,7 +176,7 @@
         await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ document_id: <doc.id> })
+          body: JSON.stringify({ document_id: doc.id })
         });
 
         item.status = 'done'; item.progress = 100; renderQueue();
@@ -186,15 +192,15 @@
       const ul = document.getElementById('uploadedList');
       if (!data?.length) { ul.innerHTML = '<div class="empty">No files uploaded yet</div>'; return; }
       ul.innerHTML = data.map(doc => `
-        <div class="uploaded-item" id="doc-${<doc.id>}">
+        <div class="uploaded-item" id="doc-${doc.id}">
           <div class="file-icon">${getIcon(doc.name)}</div>
           <div class="uploaded-info">
             <div class="uploaded-name">${doc.name}</div>
             <div class="uploaded-meta">${formatSize(doc.size)} · ${new Date(doc.created_at).toLocaleDateString()}</div>
           </div>
           <span class="badge badge-${doc.status === 'processed' ? 'processed' : 'uploaded'}">${doc.status}</span>
-          ${doc.status === 'processed' ? `<a class="chat-btn" href="chat.html?doc=${<doc.id>}">Chat →</a>` : ''}
-          <button class="delete-btn" onclick="deleteDoc('${<doc.id>}','${doc.storage_path}')">Delete</button>
+          ${doc.status === 'processed' ? `<a class="chat-btn" href="chat.html?doc=${doc.id}">Chat →</a>` : ''}
+          <button class="delete-btn" onclick="deleteDoc('${doc.id}','${doc.storage_path}')">Delete</button>
         </div>`).join('');
     }
 
