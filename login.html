@@ -63,11 +63,16 @@
       btn.textContent = 'Sending…';
       const email = document.getElementById('email').value.trim();
       const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: 'https://dhruvaldoshi.github.io/TML-Intel/upload.html' }
-      });
-      if (error) {
-        showMsg(error.message, 'error');
+  email,
+  options: {
+    shouldCreateUser: false,
+    emailRedirectTo: 'https://dhruvaldoshi.github.io/TML-Intel/upload.html'
+  }
+});
+
+     if (error) {
+  showMsg(error.message.includes('not found') ? 'This email is not authorised. Contact your admin.' : error.message, 'error');
+
         btn.disabled = false;
         btn.textContent = 'Send login link';
       } else {
