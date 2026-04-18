@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TML Intel — Upload</title>
+  <script src="<https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2>"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #080808; color: #ece8df; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; min-height: 100vh; padding: 40px 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+    h1 { font-size: 22px; font-weight: 600; }
+    .nav { display: flex; gap: 8px; }
+    .nav a { color: #888; font-size: 13px; text-decoration: none; padding: 5px 12px; border: 1px solid #222; border-radius: 6px; }
+    .nav a.active, .nav a:hover { color: #f5a623; border-color: #f5a623; }
+    .logout { margin-left: auto; background: none; border: 1px solid #222; color: #888; font-size: 13px; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    .logout:hover { border-color: #f87171; color: #f87171; }
+    .dropzone { border: 2px dashed #333; border-radius: 16px; padding: 60px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0d0d0d; position: relative; }
+    .dropzone:hover, .dropzone.drag-over { border-color: #f5a623; background: #111; }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { font-size: 48px; margin-bottom: 16px; }
+    .drop-title { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+    .drop-subtitle { color: #888; font-size: 13px; }
+    .file-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+    .file-type-tag { background: #1a1a1a; border: 1px solid #222; border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #888; }
+    .section-title { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 32px 0 12px; }
+    .file-list { display: flex; flex-direction: column; gap: 8px; }
+    .file-item, .uploaded-item { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .file-icon { font-size: 24px; flex-shrink: 0; }
+    .file-info, .uploaded-info { flex: 1; min-width: 0; }
+    .file-name, .uploaded-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta, .uploaded-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .file-status { font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .status-pending { color: #888; } .status-uploading { color: #f5a623; } .status-processing { color: #60a5fa; } .status-done { color: #4ade80; } .status-error { color: #f87171; }
+    .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+    .badge-processed { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .badge-uploaded { background: #1c1917; color: #888; border: 1px solid #333; }
+    .progress-bar { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #f5a623; border-radius: 2px; transition: width 0.3s; }
+    .remove-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 18px; padding: 4px; }
+    .remove-btn:hover { color: #f87171; }
+    .upload-btn { display: block; width: 100%; margin-top: 16px; padding: 14px; background: #f5a623; color: #080808; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .upload-btn:hover { opacity: 0.9; } .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .chat-btn { background: none; border: 1px solid #222; color: #888; cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; text-decoration: none; }
+    .chat-btn:hover { border-color: #4ade80; color: #4ade80; }
+    .delete-btn { background: none; border: 1px solid #222; color: #555; cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; }
+    .delete-btn:hover { border-color: #f87171; color: #f87171; }
+    .empty { color: #555; font-size: 14px; text-align: center; padding: 24px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a1a; border: 1px solid #222; border-radius: 10px; padding: 12px 18px; font-size: 14px; opacity: 0; transform: translateY(8px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: #4ade80; color: #4ade80; }
+    .toast.error { border-color: #f87171; color: #f87171; }
+  </style>
+</head>
+<body style="display:none">
+  <div class="container">
+    <div class="header">
+      <h1>TML Intel</h1>
+      <nav class="nav">
+        <a href="upload.html" class="active">Upload</a>
+        <a href="chat.html">Chat with Data</a>
+      </nav>
+      <button class="logout" id="logoutBtn">Sign out</button>
+    </div>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" multiple accept=".csv,.xls,.xlsx" />
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop CSV or Excel files here</div>
+      <div class="drop-subtitle">Click to browse · Multiple files supported</div>
+      <div class="file-types">
+        <span class="file-type-tag">CSV</span>
+        <span class="file-type-tag">Excel (.xlsx)</span>
+        <span class="file-type-tag">Excel (.xls)</span>
+      </div>
+    </div>
+    <div id="queueSection" style="display:none">
+      <div class="section-title">Ready to upload</div>
+      <div class="file-list" id="queue"></div>
+      <button class="upload-btn" id="uploadBtn">Upload & Process Files</button>
+    </div>
+    <div class="section-title">Your files</div>
+    <div class="file-list" id="uploadedList">
+      <div class="empty">No files uploaded yet</div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = '<https://hwceecnfjvbscosyknyg.supabase.co>';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
+    const { createClient } = window.supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let token = null;
+    let queue = [];
+
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      token = session.access_token;
+      document.body.style.display = 'block';
+      loadUploaded();
+    })();
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.replace('login.html');
+    });
+
+    function getIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      return { csv: '📊', xlsx: '📗', xls: '📗' }[ext] || '📁';
+    }
+    function formatSize(b) { return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = `toast show ${type}`;
+      setTimeout(() => t.className = 'toast', 3000);
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag-over'); addToQueue([...e.dataTransfer.files]); });
+    fileInput.addEventListener('change', () => addToQueue([...fileInput.files]));
+
+    function addToQueue(files) {
+      files.forEach(f => {
+        if (queue.find(q => q.file.name === f.name)) return;
+        queue.push({ file: f, status: 'pending', progress: 0, id: Math.random().toString(36).slice(2) });
+      });
+      renderQueue();
+    }
+
+    function renderQueue() {
+      const qs = document.getElementById('queueSection');
+      if (!queue.length) { qs.style.display = 'none'; return; }
+      qs.style.display = 'block';
+      document.getElementById('queue').innerHTML = queue.map(item => `
+        <div class="file-item">
+          <div class="file-icon">${getIcon(item.file.name)}</div>
+          <div class="file-info">
+            <div class="file-name">${item.file.name}</div>
+            <div class="file-meta">${formatSize(item.file.size)}</div>
+            ${['uploading','processing'].includes(item.status) ? `<div class="progress-bar"><div class="progress-fill" style="width:${item.progress}%"></div></div>` : ''}
+          </div>
+          <div class="file-status status-${item.status}">${{pending:'Ready',uploading:'Uploading…',processing:'Processing…',done:'✓ Done',error:'✗ Error'}[item.status]}</div>
+          ${item.status === 'pending' ? `<button class="remove-btn" onclick="removeItem('${<item.id>}')">×</button>` : ''}
+        </div>`).join('');
+    }
+
+    function removeItem(id) { queue = queue.filter(q => <q.id> !== id); renderQueue(); }
+
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      document.getElementById('uploadBtn').disabled = true;
+      for (const item of queue.filter(q => q.status === 'pending')) {
+        item.status = 'uploading'; item.progress = 20; renderQueue();
+        const path = `${Date.now()}_${item.file.name}`;
+        const { error: upErr } = await sb.storage.from('documents').upload(path, item.file);
+        if (upErr) { item.status = 'error'; renderQueue(); showToast(`Failed: ${item.file.name}`, 'error'); continue; }
+
+        item.progress = 50; renderQueue();
+        const { data: doc } = await sb.from('documents').insert({
+          name: item.file.name, type: item.file.type, size: item.file.size, storage_path: path, source: 'upload'
+        }).select().single();
+
+        item.status = 'processing'; item.progress = 70; renderQueue();
+        await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ document_id: <doc.id> })
+        });
+
+        item.status = 'done'; item.progress = 100; renderQueue();
+        showToast(`Ready: ${item.file.name}`);
+      }
+      setTimeout(() => { queue = queue.filter(q => q.status !== 'done'); renderQueue(); loadUploaded(); }, 1500);
+      document.getElementById('uploadBtn').disabled = false;
+      fileInput.value = '';
+    });
+
+    async function loadUploaded() {
+      const { data } = await sb.from('documents').select('*').order('created_at', { ascending: false });
+      const ul = document.getElementById('uploadedList');
+      if (!data?.length) { ul.innerHTML = '<div class="empty">No files uploaded yet</div>'; return; }
+      ul.innerHTML = data.map(doc => `
+        <div class="uploaded-item" id="doc-${<doc.id>}">
+          <div class="file-icon">${getIcon(doc.name)}</div>
+          <div class="uploaded-info">
+            <div class="uploaded-name">${doc.name}</div>
+            <div class="uploaded-meta">${formatSize(doc.size)} · ${new Date(doc.created_at).toLocaleDateString()}</div>
+          </div>
+          <span class="badge badge-${doc.status === 'processed' ? 'processed' : 'uploaded'}">${doc.status}</span>
+          ${doc.status === 'processed' ? `<a class="chat-btn" href="chat.html?doc=${<doc.id>}">Chat →</a>` : ''}
+          <button class="delete-btn" onclick="deleteDoc('${<doc.id>}','${doc.storage_path}')">Delete</button>
+        </div>`).join('');
+    }
+
+    async function deleteDoc(id, path) {
+      await sb.storage.from('documents').remove([path]);
+      await sb.from('documents').delete().eq('id', id);
+      document.getElementById(`doc-${id}`)?.remove();
+      showToast('File deleted');
+    }
+  </script>
+</body>
+</html>
