@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TML Intel — Upload Data</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #080808; color: #ece8df; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; min-height: 100vh; padding: 40px 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: #ece8df; }
+    .subtitle { color: #888; font-size: 14px; margin-bottom: 40px; }
+    .dropzone { border: 2px dashed #333; border-radius: 16px; padding: 60px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0d0d0d; position: relative; }
+    .dropzone:hover, .dropzone.drag-over { border-color: #f5a623; background: #111; }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { font-size: 48px; margin-bottom: 16px; }
+    .drop-title { font-size: 18px; font-weight: 500; margin-bottom: 8px; color: #ece8df; }
+    .drop-subtitle { color: #888; font-size: 13px; }
+    .file-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+    .file-type-tag { background: #1a1a1a; border: 1px solid #222; border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #888; }
+    .section-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 32px 0 12px; }
+    .file-list { display: flex; flex-direction: column; gap: 8px; }
+    .file-item { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .file-icon { font-size: 24px; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .file-status { font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .status-pending { color: #888; }
+    .status-uploading { color: #f5a623; }
+    .status-done { color: #4ade80; }
+    .status-error { color: #f87171; }
+    .progress-bar { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #f5a623; border-radius: 2px; transition: width 0.3s; }
+    .remove-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 18px; padding: 4px; flex-shrink: 0; transition: color 0.2s; }
+    .remove-btn:hover { color: #f87171; }
+    .upload-btn { display: block; width: 100%; margin-top: 16px; padding: 14px; background: #f5a623; color: #080808; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .upload-btn:hover { opacity: 0.9; }
+    .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .uploaded-item { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .uploaded-info { flex: 1; min-width: 0; }
+    .uploaded-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .uploaded-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .delete-btn { background: none; border: 1px solid #222; color: #888; cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px; transition: all 0.2s; flex-shrink: 0; }
+    .delete-btn:hover { border-color: #f87171; color: #f87171; }
+    .empty { color: #555; font-size: 14px; text-align: center; padding: 24px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a1a; border: 1px solid #222; border-radius: 10px; padding: 12px 18px; font-size: 14px; opacity: 0; transform: translateY(8px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: #4ade80; color: #4ade80; }
+    .toast.error { border-color: #f87171; color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TML Intel</h1>
+    <p class="subtitle">Upload files to analyse with Claude AI</p>
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" multiple accept=".pdf,.txt,.csv,.json,.xls,.xlsx,.png,.jpg,.jpeg" />
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop files here or click to browse</div>
+      <div class="drop-subtitle">Upload multiple files at once</div>
+      <div class="file-types">
+        <span class="file-type-tag">PDF</span>
+        <span class="file-type-tag">CSV</span>
+        <span class="file-type-tag">Excel</span>
+        <span class="file-type-tag">TXT</span>
+        <span class="file-type-tag">JSON</span>
+        <span class="file-type-tag">Images</span>
+      </div>
+    </div>
+
+    <div id="queueSection" style="display:none">
+      <div class="section-title">Ready to upload</div>
+      <div class="file-list" id="queue"></div>
+      <button class="upload-btn" id="uploadBtn">Upload All Files</button>
+    </div>
+
+    <div class="section-title">Uploaded files</div>
+    <div class="file-list" id="uploadedList">
+      <div class="empty">No files uploaded yet</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://hwceecnfjvbscosyknyg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
+
+    const { createClient } = window.supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const queueSection = document.getElementById('queueSection');
+    const queueEl = document.getElementById('queue');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadedList = document.getElementById('uploadedList');
+    const toast = document.getElementById('toast');
+
+    let queue = [];
+
+    function getIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      const icons = { pdf: '📄', csv: '📊', xlsx: '📊', xls: '📊', txt: '📝', json: '🗂️', png: '🖼️', jpg: '🖼️', jpeg: '🖼️' };
+      return icons[ext] || '📁';
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function showToast(msg, type = 'success') {
+      toast.textContent = msg;
+      toast.className = `toast show ${type}`;
+      setTimeout(() => toast.className = 'toast', 3000);
+    }
+
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      addToQueue([...e.dataTransfer.files]);
+    });
+    fileInput.addEventListener('change', () => addToQueue([...fileInput.files]));
+
+    function addToQueue(files) {
+      files.forEach(f => {
+        if (queue.find(q => q.file.name === f.name)) return;
+        queue.push({ file: f, status: 'pending', progress: 0, id: Math.random().toString(36).slice(2) });
+      });
+      renderQueue();
+    }
+
+    function renderQueue() {
+      if (queue.length === 0) { queueSection.style.display = 'none'; return; }
+      queueSection.style.display = 'block';
+      queueEl.innerHTML = queue.map(item => `
+        <div class="file-item" id="qi-${item.id}">
+          <div class="file-icon">${getIcon(item.file.name)}</div>
+          <div class="file-info">
+            <div class="file-name">${item.file.name}</div>
+            <div class="file-meta">${formatSize(item.file.size)}</div>
+            ${item.status === 'uploading' ? `<div class="progress-bar"><div class="progress-fill" style="width:${item.progress}%"></div></div>` : ''}
+          </div>
+          <div class="file-status status-${item.status}">
+            ${item.status === 'pending' ? 'Ready' : item.status === 'uploading' ? `${item.progress}%` : item.status === 'done' ? '✓ Done' : '✗ Error'}
+          </div>
+          ${item.status === 'pending' ? `<button class="remove-btn" onclick="removeFromQueue('${item.id}')">×</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function removeFromQueue(id) {
+      queue = queue.filter(q => q.id !== id);
+      renderQueue();
+    }
+
+    uploadBtn.addEventListener('click', uploadAll);
+
+    async function uploadAll() {
+      uploadBtn.disabled = true;
+      const pending = queue.filter(q => q.status === 'pending');
+
+      for (const item of pending) {
+        item.status = 'uploading';
+        item.progress = 10;
+        renderQueue();
+
+        const path = `${Date.now()}_${item.file.name}`;
+        const { error } = await sb.storage.from('documents').upload(path, item.file, { cacheControl: '3600', upsert: false });
+
+        if (error) {
+          item.status = 'error';
+          renderQueue();
+          showToast(`Failed: ${item.file.name}`, 'error');
+          continue;
+        }
+
+        item.progress = 80;
+        renderQueue();
+
+        await sb.from('documents').insert({
+          name: item.file.name,
+          type: item.file.type,
+          size: item.file.size,
+          storage_path: path,
+          source: 'upload',
+        });
+
+        item.status = 'done';
+        item.progress = 100;
+        renderQueue();
+        showToast(`Uploaded: ${item.file.name}`);
+      }
+
+      setTimeout(() => {
+        queue = queue.filter(q => q.status !== 'done');
+        renderQueue();
+        loadUploaded();
+      }, 1500);
+
+      uploadBtn.disabled = false;
+      fileInput.value = '';
+    }
+
+    async function loadUploaded() {
+      const { data, error } = await sb.from('documents').select('*').order('created_at', { ascending: false });
+      if (error || !data || data.length === 0) {
+        uploadedList.innerHTML = '<div class="empty">No files uploaded yet</div>';
+        return;
+      }
+      uploadedList.innerHTML = data.map(doc => `
+        <div class="uploaded-item" id="doc-${doc.id}">
+          <div class="file-icon">${getIcon(doc.name)}</div>
+          <div class="uploaded-info">
+            <div class="uploaded-name">${doc.name}</div>
+            <div class="uploaded-meta">${formatSize(doc.size)} · ${new Date(doc.created_at).toLocaleDateString()}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteDoc('${doc.id}', '${doc.storage_path}')">Delete</button>
+        </div>
+      `).join('');
+    }
+
+    async function deleteDoc(id, path) {
+      await sb.storage.from('documents').remove([path]);
+      await sb.from('documents').delete().eq('id', id);
+      document.getElementById(`doc-${id}`)?.remove();
+      if (!uploadedList.children.length) uploadedList.innerHTML = '<div class="empty">No files uploaded yet</div>';
+      showToast('File deleted');
+    }
+
+    loadUploaded();
+  </script>
+</body>
+</html>
