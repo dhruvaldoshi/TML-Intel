@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TML Intel — Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #080808; color: #ece8df; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    .header { padding: 16px 24px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    h1 { font-size: 18px; font-weight: 600; }
+    .nav a { color: #888; font-size: 13px; text-decoration: none; padding: 5px 12px; border: 1px solid #222; border-radius: 6px; }
+    .nav a:hover { color: #f5a623; border-color: #f5a623; }
+    .file-select { background: #111; border: 1px solid #222; color: #ece8df; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; max-width: 260px; }
+    .logout { margin-left: auto; background: none; border: 1px solid #222; color: #888; font-size: 13px; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+    .logout:hover { border-color: #f87171; color: #f87171; }
+    .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+    .welcome { text-align: center; padding: 60px 20px; color: #555; }
+    .welcome h2 { font-size: 18px; color: #888; margin-bottom: 8px; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+    .suggestion { background: #111; border: 1px solid #222; border-radius: 8px; padding: 8px 14px; font-size: 13px; color: #888; cursor: pointer; }
+    .suggestion:hover { border-color: #f5a623; color: #f5a623; }
+    .msg { display: flex; flex-direction: column; gap: 8px; max-width: 800px; }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.assistant { align-self: flex-start; align-items: flex-start; }
+    .bubble { padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+    .msg.user .bubble { background: #f5a623; color: #080808; border-radius: 12px 12px 2px 12px; }
+    .msg.assistant .bubble { background: #111; border: 1px solid #1a1a1a; border-radius: 12px 12px 12px 2px; }
+    .chart-wrap { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 12px; padding: 20px; width: 100%; max-width: 600px; }
+    .chart-title { font-size: 13px; font-weight: 600; color: #888; margin-bottom: 16px; }
+    .table-wrap { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 12px; overflow: hidden; max-width: 600px; width: 100%; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #111; color: #888; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 1px solid #1a1a1a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #111; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #111; }
+    .input-area { padding: 16px 24px; border-top: 1px solid #1a1a1a; display: flex; gap: 10px; flex-shrink: 0; }
+    .input-wrap { flex: 1; background: #111; border: 1px solid #222; border-radius: 10px; display: flex; align-items: center; padding: 0 14px; }
+    input[type="text"] { flex: 1; background: none; border: none; outline: none; color: #ece8df; font-size: 14px; padding: 12px 0; }
+    input[type="text"]::placeholder { color: #555; }
+    input:disabled { opacity: 0.5; }
+    .send-btn { background: #f5a623; color: #080808; border: none; border-radius: 8px; width: 42px; height: 42px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .thinking { display: flex; gap: 4px; padding: 14px 16px; background: #111; border: 1px solid #1a1a1a; border-radius: 12px; }
+    .dot { width: 6px; height: 6px; background: #555; border-radius: 50%; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)} }
+  </style>
+</head>
+<body style="display:none">
+  <div class="header">
+    <h1>TML Intel</h1>
+    <nav class="nav"><a href="upload.html">← Upload</a></nav>
+    <select class="file-select" id="fileSelect">
+      <option value="">Select a file…</option>
+    </select>
+    <button class="logout" id="logoutBtn">Sign out</button>
+  </div>
+  <div class="messages" id="messages">
+    <div class="welcome">
+      <h2>Select a file above to get started</h2>
+      <p>Ask anything — Claude will analyse your data and show charts</p>
+    </div>
+  </div>
+  <div class="input-area">
+    <div class="input-wrap">
+      <input type="text" id="input" placeholder="Ask a question about your data…" disabled />
+    </div>
+    <button class="send-btn" id="sendBtn" disabled>↑</button>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://hwceecnfjvbscosyknyg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
+    const { createClient } = window.supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let token = null;
+    let currentDocId = new URLSearchParams(location.search).get('doc');
+    let charts = {};
+
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      token = session.access_token;
+      document.body.style.display = 'flex';
+      await loadFiles();
+    })();
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.replace('login.html');
+    });
+
+    async function loadFiles() {
+      const { data } = await sb.from('documents').select('*').eq('status', 'processed').order('created_at', { ascending: false });
+      const sel = document.getElementById('fileSelect');
+      (data || []).forEach(doc => {
+        const opt = document.createElement('option');
+        opt.value = doc.id; opt.textContent = doc.name;
+        sel.appendChild(opt);
+      });
+      if (currentDocId) { sel.value = currentDocId; enableChat(); }
+    }
+
+    document.getElementById('fileSelect').addEventListener('change', () => {
+      currentDocId = document.getElementById('fileSelect').value;
+      if (currentDocId) enableChat();
+    });
+
+    function enableChat() {
+      const input = document.getElementById('input');
+      const sendBtn = document.getElementById('sendBtn');
+      input.disabled = false; sendBtn.disabled = false;
+      const name = document.getElementById('fileSelect').options[document.getElementById('fileSelect').selectedIndex]?.text;
+      document.getElementById('messages').innerHTML = `
+        <div class="welcome" style="padding:40px 20px">
+          <h2>Chatting with: ${name}</h2>
+          <p style="margin-top:8px;color:#666">Try asking:</p>
+          <div class="suggestions" style="margin-top:12px">
+            <div class="suggestion" onclick="ask('Give me a summary of this data')">Summary</div>
+            <div class="suggestion" onclick="ask('Show me the top 10 rows')">Top 10 rows</div>
+            <div class="suggestion" onclick="ask('Show a bar chart of the data')">Bar chart</div>
+            <div class="suggestion" onclick="ask('What are the key trends?')">Key trends</div>
+            <div class="suggestion" onclick="ask('What recommendations do you have?')">Recommendations</div>
+          </div>
+        </div>`;
+    }
+
+    function ask(q) { document.getElementById('input').value = q; send(); }
+
+    document.getElementById('sendBtn').addEventListener('click', send);
+    document.getElementById('input').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+    async function send() {
+      const input = document.getElementById('input');
+      const q = input.value.trim();
+      if (!q || !currentDocId) return;
+      input.value = '';
+      document.getElementById('sendBtn').disabled = true;
+
+      addMsg('user', q);
+      const thinking = addThinking();
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/query-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ document_id: currentDocId, question: q })
+        });
+        const data = await res.json();
+        thinking.remove();
+        renderResponse(data);
+      } catch {
+        thinking.remove();
+        addMsg('assistant', 'Something went wrong. Please try again.');
+      }
+      document.getElementById('sendBtn').disabled = false;
+      input.focus();
+    }
+
+    function addMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      div.innerHTML = `<div class="bubble">${text}</div>`;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 99999;
+      return div;
+    }
+
+    function addThinking() {
+      const div = document.createElement('div');
+      div.className = 'msg assistant';
+      div.innerHTML = '<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 99999;
+      return div;
+    }
+
+    function renderResponse(data) {
+      if (data.error) { addMsg('assistant', `Error: ${data.error}`); return; }
+      const div = document.createElement('div');
+      div.className = 'msg assistant';
+      let html = '';
+      if (data.answer) html += `<div class="bubble">${data.answer}</div>`;
+
+      if (data.chart?.type) {
+        const id = 'c' + Math.random().toString(36).slice(2);
+        html += `<div class="chart-wrap"><div class="chart-title">${data.chart.title||''}</div><canvas id="${id}"></canvas></div>`;
+        div.innerHTML = html;
+        document.getElementById('messages').appendChild(div);
+        document.getElementById('messages').scrollTop = 99999;
+        const colors = ['#f5a623','#60a5fa','#4ade80','#f87171','#c084fc','#2dd4bf','#fb923c','#a78bfa'];
+        if (charts[id]) charts[id].destroy();
+        charts[id] = new Chart(document.getElementById(id), {
+          type: data.chart.type,
+          data: { labels: data.chart.labels, datasets: [{ data: data.chart.values, backgroundColor: colors, borderColor: data.chart.type==='line'?'#f5a623':colors, borderWidth: data.chart.type==='line'?2:1, tension: 0.4, fill: false }] },
+          options: { responsive: true, plugins: { legend: { display: data.chart.type==='pie', labels: { color:'#888' } } }, scales: data.chart.type!=='pie'?{ x:{ticks:{color:'#888'},grid:{color:'#1a1a1a'}}, y:{ticks:{color:'#888'},grid:{color:'#1a1a1a'}} }:{} }
+        });
+        return;
+      }
+
+      if (data.table?.headers) {
+        html += `<div class="table-wrap"><table><thead><tr>${data.table.headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${data.table.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      }
+
+      div.innerHTML = html;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = 99999;
+    }
+  </script>
+</body>
+</html>
