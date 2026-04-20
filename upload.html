@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TML Intel — Upload</title>
@@ -160,33 +162,47 @@
     function removeItem(id) { queue = queue.filter(q => q.id !== id); renderQueue(); }
 
     document.getElementById('uploadBtn').addEventListener('click', async () => {
-      document.getElementById('uploadBtn').disabled = true;
-      for (const item of queue.filter(q => q.status === 'pending')) {
-        item.status = 'uploading'; item.progress = 20; renderQueue();
-        const path = `${Date.now()}_${item.file.name}`;
-        const { error: upErr } = await sb.storage.from('documents').upload(path, item.file);
-        if (upErr) { item.status = 'error'; renderQueue(); showToast(`Failed: ${item.file.name}`, 'error'); continue; }
+  document.getElementById('uploadBtn').disabled = true;
+  for (const item of queue.filter(q => q.status === 'pending')) {
+    item.status = 'uploading'; item.progress = 20; renderQueue();
 
-        item.progress = 50; renderQueue();
-        const { data: doc } = await sb.from('documents').insert({
-          name: item.file.name, type: item.file.type, size: item.file.size, storage_path: path, source: 'upload'
-        }).select().single();
+    // Convert Excel to CSV in browser before uploading
+    let uploadFile = item.file;
+    let uploadName = item.file.name;
+    if (/\.(xlsx|xls)$/i.test(item.file.name)) {
+      const buffer = await item.file.arrayBuffer();
+      const workbook = XLSX.read(buffer);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      uploadName = item.file.name.replace(/\.(xlsx|xls)$/i, '.csv');
+      uploadFile = new File([new Blob([csv], { type: 'text/csv' })], uploadName, { type: 'text/csv' });
+    }
 
-      item.status = 'processing'; item.progress = 70; renderQueue();
-const { data: { session: s } } = await sb.auth.getSession();
-await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${s?.access_token}` },
-  body: JSON.stringify({ document_id: doc.id })
+    const path = `${Date.now()}_${uploadName}`;
+    const { error: upErr } = await sb.storage.from('documents').upload(path, uploadFile);
+    if (upErr) { item.status = 'error'; renderQueue(); showToast(`Failed: ${item.file.name}`, 'error'); continue; }
+
+    item.progress = 50; renderQueue();
+    const { data: { session: s } } = await sb.auth.getSession();
+    const { data: doc } = await sb.from('documents').insert({
+      name: item.file.name, type: 'text/csv', size: uploadFile.size, storage_path: path, source: 'upload'
+    }).select().single();
+
+    item.status = 'processing'; item.progress = 70; renderQueue();
+    await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${s?.access_token}` },
+      body: JSON.stringify({ document_id: doc.id })
+    });
+
+    item.status = 'done'; item.progress = 100; renderQueue();
+    showToast(`Ready: ${item.file.name}`);
+  }
+  setTimeout(() => { queue = queue.filter(q => q.status !== 'done'); renderQueue(); loadUploaded(); }, 1500);
+  document.getElementById('uploadBtn').disabled = false;
+  fileInput.value = '';
 });
 
-        item.status = 'done'; item.progress = 100; renderQueue();
-        showToast(`Ready: ${item.file.name}`);
-      }
-      setTimeout(() => { queue = queue.filter(q => q.status !== 'done'); renderQueue(); loadUploaded(); }, 1500);
-      document.getElementById('uploadBtn').disabled = false;
-      fileInput.value = '';
-    });
 
     async function loadUploaded() {
       const { data } = await sb.from('documents').select('*').order('created_at', { ascending: false });
