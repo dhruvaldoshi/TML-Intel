@@ -172,12 +172,13 @@
           name: item.file.name, type: item.file.type, size: item.file.size, storage_path: path, source: 'upload'
         }).select().single();
 
-        item.status = 'processing'; item.progress = 70; renderQueue();
-        await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ document_id: doc.id })
-        });
+      item.status = 'processing'; item.progress = 70; renderQueue();
+const { data: { session: s } } = await sb.auth.getSession();
+await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${s?.access_token}` },
+  body: JSON.stringify({ document_id: doc.id })
+});
 
         item.status = 'done'; item.progress = 100; renderQueue();
         showToast(`Ready: ${item.file.name}`);
