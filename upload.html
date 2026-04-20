@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TML Intel — Upload</title>
@@ -161,7 +160,7 @@
 
     function removeItem(id) { queue = queue.filter(q => q.id !== id); renderQueue(); }
 
-    document.getElementById('uploadBtn').addEventListener('click', async () => {
+document.getElementById('uploadBtn').addEventListener('click', async () => {
   document.getElementById('uploadBtn').disabled = true;
   for (const item of queue.filter(q => q.status === 'pending')) {
     item.status = 'uploading'; item.progress = 20; renderQueue();
@@ -202,7 +201,6 @@
   document.getElementById('uploadBtn').disabled = false;
   fileInput.value = '';
 });
-
 
     async function loadUploaded() {
       const { data } = await sb.from('documents').select('*').order('created_at', { ascending: false });
