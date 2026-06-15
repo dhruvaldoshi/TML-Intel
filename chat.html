@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+1	<!DOCTYPE html>
 2	<html lang="en">
 3	<head>
 4	  <meta charset="UTF-8" />
@@ -172,290 +172,295 @@
 172	    let allFiles = [];
 173	    let selectedIds = new Set();
 174	    let charts = {};
-175	
-176	    const urlDoc = new URLSearchParams(location.search).get('doc');
-177	    const projectId = new URLSearchParams(location.search).get('project');
-178	    if (urlDoc) selectedIds.add(urlDoc);
-179	
-180	    // Update back link based on project context
-181	    if (projectId) {
-182	      document.getElementById('backLink').href = `upload.html?project=${projectId}`;
-183	      document.getElementById('backLink').textContent = '← Upload';
-184	    }
-185	
-186	    (async () => {
-187	      const { data: { session } } = await sb.auth.getSession();
-188	      if (!session) { window.location.replace('login.html'); return; }
-189	      token = session.access_token;
-190	      await loadFiles();
-191	      await loadInsights();
-192	      if (selectedIds.size) { renderTags(); enableChat(); showWelcomeForFiles(); }
-193	    })();
-194	
-195	    document.getElementById('logoutBtn').addEventListener('click', async () => {
-196	      await sb.auth.signOut(); window.location.replace('login.html');
-197	    });
-198	
-199	    async function loadFiles() {
-200	      const query = sb.from('documents').select('id, name').eq('status', 'processed').order('created_at', { ascending: false });
-201	      if (projectId) query.eq('project_id', projectId);
-202	      const { data } = await query;
-203	      allFiles = data || [];
-204	      renderPickerList();
-205	    }
-206	
-207	    function renderPickerList() {
-208	      const list = document.getElementById('pickerList');
-209	      if (!allFiles.length) { list.innerHTML = '<div class="picker-empty">No processed files yet</div>'; return; }
-210	      list.innerHTML = allFiles.map(f => `
-211	        <div class="picker-item" onclick="toggleFile('${f.id}', '${f.name.replace(/'/g,"\\'")}')">
-212	          <input type="checkbox" id="chk_${f.id}" ${selectedIds.has(f.id) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleFile('${f.id}', '${f.name.replace(/'/g,"\\'")}')">
-213	          <label for="chk_${f.id}" title="${f.name}">${f.name}</label>
-214	        </div>`).join('');
-215	    }
-216	
-217	    function toggleFile(id, name) {
-218	      if (selectedIds.has(id)) selectedIds.delete(id);
-219	      else selectedIds.add(id);
-220	      const chk = document.getElementById('chk_' + id);
-221	      if (chk) chk.checked = selectedIds.has(id);
-222	      renderTags();
-223	      if (selectedIds.size) { enableChat(); showWelcomeForFiles(); }
-224	      else { disableChat(); }
-225	      document.getElementById('joinHint').style.display = selectedIds.size > 1 ? 'block' : 'none';
-226	    }
-227	
-228	    function renderTags() {
-229	      document.getElementById('selectedTags').innerHTML = [...selectedIds].map(id => {
-230	        const f = allFiles.find(x => x.id === id);
-231	        return f ? `<div class="tag">${f.name}<button onclick="toggleFile('${f.id}','${f.name.replace(/'/g,"\\'")}')">×</button></div>` : '';
-232	      }).join('');
-233	    }
-234	
-235	    const pickerBtn = document.getElementById('pickerBtn');
-236	    const pickerDropdown = document.getElementById('pickerDropdown');
-237	    pickerBtn.addEventListener('click', e => { e.stopPropagation(); pickerDropdown.style.display = pickerDropdown.style.display === 'none' ? 'block' : 'none'; });
-238	    document.addEventListener('click', () => pickerDropdown.style.display = 'none');
-239	    document.querySelector('.picker-wrap').addEventListener('click', e => e.stopPropagation());
-240	
-241	    function enableChat() { document.getElementById('input').disabled = false; document.getElementById('sendBtn').disabled = false; }
-242	    function disableChat() { document.getElementById('input').disabled = true; document.getElementById('sendBtn').disabled = true; }
-243	
-244	    function showWelcomeForFiles() {
-245	      const names = [...selectedIds].map(id => allFiles.find(f => f.id === id)?.name).filter(Boolean);
-246	      document.getElementById('messages').innerHTML = `
-247	        <div class="welcome">
-248	          <h2>Chatting with: ${names.join(' + ')}</h2>
-249	          ${names.length > 1 ? '<p style="color:#666;font-size:13px;margin-top:4px">Tip: Add a join hint above if the files share a common column</p>' : ''}
-250	          <div class="suggestions" style="margin-top:16px">
-251	            <div class="suggestion" onclick="ask('Give me a summary of this data')">Summary</div>
-252	            <div class="suggestion" onclick="ask('What are the top 10 rows by value?')">Top 10</div>
-253	            <div class="suggestion" onclick="ask('Show me a bar chart')">Bar chart</div>
-254	            <div class="suggestion" onclick="ask('What are the key trends?')">Key trends</div>
-255	            ${names.length > 1 ? '<div class="suggestion" onclick="ask(\'Join the tables and show me a combined view\')">Join tables</div>' : ''}
-256	            <div class="suggestion" onclick="ask('What recommendations do you have?')">Recommendations</div>
-257	          </div>
-258	        </div>`;
-259	    }
-260	
-261	    function ask(q) { document.getElementById('input').value = q; send(); }
-262	
-263	    document.getElementById('sendBtn').addEventListener('click', send);
-264	    document.getElementById('input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) send(); });
-265	
-266	    async function send() {
-267	      const input = document.getElementById('input');
-268	      const q = input.value.trim();
-269	      if (!q || !selectedIds.size) return;
-270	      pickerDropdown.style.display = 'none';
-271	      input.value = '';
-272	      document.getElementById('sendBtn').disabled = true;
-273	
-274	      addUserMsg(q);
-275	      const thinking = addThinking();
-276	
-277	      try {
-278	        const res = await fetch(`${SUPABASE_URL}/functions/v1/query-data`, {
-279	          method: 'POST',
-280	          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
-281	          body: JSON.stringify({
-282	            document_ids: [...selectedIds],
-283	            question: q,
-284	            join_hint: document.getElementById('joinHint').value.trim() || undefined
-285	          })
-286	        });
-287	        const data = await res.json();
-288	        thinking.remove();
-289	        renderResponse(q, data);
-290	      } catch(e) {
-291	        thinking.remove();
-292	        addAssistantMsg('Something went wrong. Please try again.');
-293	      }
-294	      document.getElementById('sendBtn').disabled = false;
-295	      input.focus();
-296	    }
-297	
-298	    function addUserMsg(text) {
-299	      const div = document.createElement('div');
-300	      div.className = 'msg user';
-301	      div.innerHTML = `<div class="bubble">${text}</div>`;
-302	      document.getElementById('messages').appendChild(div);
-303	      scrollBottom();
-304	    }
-305	
-306	    function addAssistantMsg(text) {
-307	      const div = document.createElement('div');
-308	      div.className = 'msg assistant';
-309	      div.innerHTML = `<div class="bubble">${text}</div>`;
-310	      document.getElementById('messages').appendChild(div);
-311	      scrollBottom();
-312	    }
-313	
-314	    function addThinking() {
-315	      const div = document.createElement('div');
-316	      div.className = 'msg assistant';
-317	      div.innerHTML = '<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
-318	      document.getElementById('messages').appendChild(div);
-319	      scrollBottom();
-320	      return div;
-321	    }
-322	
-323	    function renderResponse(question, data) {
-324	      if (data.error) { addAssistantMsg(`Error: ${data.error}`); return; }
-325	
-326	      const div = document.createElement('div');
-327	      div.className = 'msg assistant';
-328	      let html = '';
-329	
-330	      if (data.answer) html += `<div class="bubble">${data.answer}</div>`;
-331	
-332	      const hasChart = data.chart?.type;
-333	      const hasTable = data.table?.headers;
-334	      const chartId = 'c' + Math.random().toString(36).slice(2);
-335	
-336	      if (hasChart) {
-337	        html += `<div class="chart-wrap"><div class="chart-title">${data.chart.title || ''}</div><canvas id="${chartId}"></canvas></div>`;
-338	      }
-339	
-340	      if (hasTable) {
-341	        html += `<div class="table-wrap"><table>
-342	          <thead><tr>${data.table.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-343	          <tbody>${data.table.rows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
-344	        </table></div>`;
-345	      }
-346	
-347	      const saveId = 'save_' + Math.random().toString(36).slice(2);
-348	      html += `<div class="msg-actions">
-349	        <button class="action-btn" id="${saveId}" onclick="openSaveModal(this, '${question.replace(/'/g,"\\'")}', ${JSON.stringify(JSON.stringify(data))})">💾 Save</button>
-350	        ${hasTable ? `<button class="action-btn csv" onclick="exportCSV(${JSON.stringify(JSON.stringify(data.table))})">⬇ Export CSV</button>` : ''}
-351	      </div>`;
-352	
-353	      div.innerHTML = html;
-354	      document.getElementById('messages').appendChild(div);
-355	      scrollBottom();
-356	
-357	      if (hasChart) {
-358	        const colors = ['#f5a623','#60a5fa','#4ade80','#f87171','#c084fc','#2dd4bf','#fb923c','#a78bfa'];
-359	        if (charts[chartId]) charts[chartId].destroy();
-360	        charts[chartId] = new Chart(document.getElementById(chartId), {
-361	          type: data.chart.type,
-362	          data: {
-363	            labels: data.chart.labels,
-364	            datasets: [{ data: data.chart.values, backgroundColor: colors, borderColor: data.chart.type === 'line' ? '#f5a623' : colors, borderWidth: data.chart.type === 'line' ? 2 : 1, tension: 0.4, fill: false }]
-365	          },
-366	          options: {
-367	            responsive: true,
-368	            plugins: { legend: { display: data.chart.type === 'pie', labels: { color: '#888' } } },
-369	            scales: data.chart.type !== 'pie' ? { x: { ticks: { color: '#888' }, grid: { color: '#1a1a1a' } }, y: { ticks: { color: '#888' }, grid: { color: '#1a1a1a' } } } : {}
-370	          }
-371	        });
-372	      }
-373	    }
-374	
-375	    function exportCSV(tableJson) {
-376	      const table = JSON.parse(tableJson);
-377	      const rows = [table.headers, ...table.rows];
-378	      const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
-379	      const blob = new Blob([csv], { type: 'text/csv' });
-380	      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-381	      a.download = `insight_${Date.now()}.csv`; a.click();
-382	    }
-383	
-384	    let savePayload = null;
-385	    function openSaveModal(btn, question, dataJson) {
-386	      savePayload = { btn, question, data: JSON.parse(dataJson) };
-387	      document.getElementById('insightTitle').value = question.slice(0, 60);
-388	      document.getElementById('modalOverlay').classList.add('open');
-389	      setTimeout(() => document.getElementById('insightTitle').select(), 50);
-390	    }
-391	    document.getElementById('modalCancel').addEventListener('click', () => {
-392	      document.getElementById('modalOverlay').classList.remove('open'); savePayload = null;
-393	    });
-394	    document.getElementById('modalSave').addEventListener('click', async () => {
-395	      const title = document.getElementById('insightTitle').value.trim();
-396	      if (!title || !savePayload) return;
-397	      const { btn, question, data } = savePayload;
-398	      const names = [...selectedIds].map(id => allFiles.find(f => f.id === id)?.name).filter(Boolean);
-399	      await sb.from('saved_insights').insert({
-400	        title, question,
-401	        answer: data.answer || null,
-402	        chart: data.chart || null,
-403	        table_data: data.table || null,
-404	        document_ids: [...selectedIds],
-405	        document_names: names,
-406	        project_id: projectId || null
-407	      });
-408	      btn.textContent = '✓ Saved'; btn.classList.add('saved'); btn.onclick = null;
-409	      document.getElementById('modalOverlay').classList.remove('open');
-410	      savePayload = null;
-411	      await loadInsights();
-412	    });
-413	
-414	    document.getElementById('insightsBtn').addEventListener('click', () => {
-415	      document.getElementById('insightsPanel').classList.add('open');
-416	      document.getElementById('panelOverlay').classList.add('open');
-417	    });
-418	    document.getElementById('panelClose').addEventListener('click', closePanel);
-419	    document.getElementById('panelOverlay').addEventListener('click', closePanel);
-420	    function closePanel() {
-421	      document.getElementById('insightsPanel').classList.remove('open');
-422	      document.getElementById('panelOverlay').classList.remove('open');
-423	    }
-424	
-425	    async function loadInsights() {
-426	      const query = sb.from('saved_insights').select('*').order('created_at', { ascending: false });
-427	      if (projectId) query.eq('project_id', projectId);
-428	      const { data } = await query;
-429	      const body = document.getElementById('panelBody');
-430	      if (!data?.length) { body.innerHTML = '<div class="panel-empty">No saved insights yet.<br>Save a response using the 💾 button.</div>'; return; }
-431	      body.innerHTML = data.map(ins => `
-432	        <div class="insight-card" onclick="replayInsight(${JSON.stringify(JSON.stringify(ins))})">
-433	          <div class="insight-title">${ins.title}</div>
-434	          <div class="insight-q">${ins.question}</div>
-435	          <div class="insight-meta">
-436	            <span>${ins.document_names?.join(' + ') || ''}</span>
-437	            <div style="display:flex;align-items:center;gap:6px">
-438	              <span>${new Date(ins.created_at).toLocaleDateString()}</span>
-439	              <button class="insight-del" onclick="event.stopPropagation();deleteInsight('${ins.id}')">×</button>
-440	            </div>
-441	          </div>
-442	        </div>`).join('');
-443	    }
-444	
-445	    function replayInsight(insJson) {
-446	      const ins = JSON.parse(insJson);
-447	      closePanel();
-448	      document.getElementById('messages').innerHTML = '';
-449	      addUserMsg(ins.question);
-450	      renderResponse(ins.question, { answer: ins.answer, chart: ins.chart, table: ins.table_data });
-451	    }
-452	
-453	    async function deleteInsight(id) {
-454	      await sb.from('saved_insights').delete().eq('id', id);
-455	      await loadInsights();
-456	    }
-457	
-458	    function scrollBottom() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
-459	  </script>
-460	</body>
-461	</html>
+175	    const responseStore = {};
+176	
+177	    const urlDoc = new URLSearchParams(location.search).get('doc');
+178	    const projectId = new URLSearchParams(location.search).get('project');
+179	    if (urlDoc) selectedIds.add(urlDoc);
+180	
+181	    // Update back link based on project context
+182	    if (projectId) {
+183	      document.getElementById('backLink').href = `upload.html?project=${projectId}`;
+184	      document.getElementById('backLink').textContent = '← Upload';
+185	    }
+186	
+187	    (async () => {
+188	      const { data: { session } } = await sb.auth.getSession();
+189	      if (!session) { window.location.replace('login.html'); return; }
+190	      token = session.access_token;
+191	      await loadFiles();
+192	      await loadInsights();
+193	      if (selectedIds.size) { renderTags(); enableChat(); showWelcomeForFiles(); }
+194	    })();
+195	
+196	    document.getElementById('logoutBtn').addEventListener('click', async () => {
+197	      await sb.auth.signOut(); window.location.replace('login.html');
+198	    });
+199	
+200	    async function loadFiles() {
+201	      let query = sb.from('documents').select('id, name').eq('status', 'processed').order('created_at', { ascending: false });
+202	      if (projectId) query = query.eq('project_id', projectId);
+203	      const { data } = await query;
+204	      allFiles = data || [];
+205	      renderPickerList();
+206	    }
+207	
+208	    function renderPickerList() {
+209	      const list = document.getElementById('pickerList');
+210	      if (!allFiles.length) { list.innerHTML = '<div class="picker-empty">No processed files yet</div>'; return; }
+211	      list.innerHTML = allFiles.map(f => `
+212	        <div class="picker-item" onclick="toggleFile('${f.id}', '${f.name.replace(/'/g,"\\'")}')">
+213	          <input type="checkbox" id="chk_${f.id}" ${selectedIds.has(f.id) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleFile('${f.id}', '${f.name.replace(/'/g,"\\'")}')">
+214	          <label for="chk_${f.id}" title="${f.name}">${f.name}</label>
+215	        </div>`).join('');
+216	    }
+217	
+218	    function toggleFile(id, name) {
+219	      if (selectedIds.has(id)) selectedIds.delete(id);
+220	      else selectedIds.add(id);
+221	      const chk = document.getElementById('chk_' + id);
+222	      if (chk) chk.checked = selectedIds.has(id);
+223	      renderTags();
+224	      if (selectedIds.size) { enableChat(); showWelcomeForFiles(); }
+225	      else { disableChat(); }
+226	      document.getElementById('joinHint').style.display = selectedIds.size > 1 ? 'block' : 'none';
+227	    }
+228	
+229	    function renderTags() {
+230	      document.getElementById('selectedTags').innerHTML = [...selectedIds].map(id => {
+231	        const f = allFiles.find(x => x.id === id);
+232	        return f ? `<div class="tag">${f.name}<button onclick="toggleFile('${f.id}','${f.name.replace(/'/g,"\\'")}')">×</button></div>` : '';
+233	      }).join('');
+234	    }
+235	
+236	    const pickerBtn = document.getElementById('pickerBtn');
+237	    const pickerDropdown = document.getElementById('pickerDropdown');
+238	    pickerBtn.addEventListener('click', e => { e.stopPropagation(); pickerDropdown.style.display = pickerDropdown.style.display === 'none' ? 'block' : 'none'; });
+239	    document.addEventListener('click', () => pickerDropdown.style.display = 'none');
+240	    document.querySelector('.picker-wrap').addEventListener('click', e => e.stopPropagation());
+241	
+242	    function enableChat() { document.getElementById('input').disabled = false; document.getElementById('sendBtn').disabled = false; }
+243	    function disableChat() { document.getElementById('input').disabled = true; document.getElementById('sendBtn').disabled = true; }
+244	
+245	    function showWelcomeForFiles() {
+246	      const names = [...selectedIds].map(id => allFiles.find(f => f.id === id)?.name).filter(Boolean);
+247	      document.getElementById('messages').innerHTML = `
+248	        <div class="welcome">
+249	          <h2>Chatting with: ${names.join(' + ')}</h2>
+250	          ${names.length > 1 ? '<p style="color:#666;font-size:13px;margin-top:4px">Tip: Add a join hint above if the files share a common column</p>' : ''}
+251	          <div class="suggestions" style="margin-top:16px">
+252	            <div class="suggestion" onclick="ask('Give me a summary of this data')">Summary</div>
+253	            <div class="suggestion" onclick="ask('What are the top 10 rows by value?')">Top 10</div>
+254	            <div class="suggestion" onclick="ask('Show me a bar chart')">Bar chart</div>
+255	            <div class="suggestion" onclick="ask('What are the key trends?')">Key trends</div>
+256	            ${names.length > 1 ? '<div class="suggestion" onclick="ask(\'Join the tables and show me a combined view\')">Join tables</div>' : ''}
+257	            <div class="suggestion" onclick="ask('What recommendations do you have?')">Recommendations</div>
+258	          </div>
+259	        </div>`;
+260	    }
+261	
+262	    function ask(q) { document.getElementById('input').value = q; send(); }
+263	
+264	    document.getElementById('sendBtn').addEventListener('click', send);
+265	    document.getElementById('input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) send(); });
+266	
+267	    async function send() {
+268	      const input = document.getElementById('input');
+269	      const q = input.value.trim();
+270	      if (!q || !selectedIds.size) return;
+271	      pickerDropdown.style.display = 'none';
+272	      input.value = '';
+273	      document.getElementById('sendBtn').disabled = true;
+274	
+275	      addUserMsg(q);
+276	      const thinking = addThinking();
+277	
+278	      try {
+279	        const res = await fetch(`${SUPABASE_URL}/functions/v1/query-data`, {
+280	          method: 'POST',
+281	          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
+282	          body: JSON.stringify({
+283	            document_ids: [...selectedIds],
+284	            question: q,
+285	            join_hint: document.getElementById('joinHint').value.trim() || undefined
+286	          })
+287	        });
+288	        const data = await res.json();
+289	        thinking.remove();
+290	        renderResponse(q, data);
+291	      } catch(e) {
+292	        thinking.remove();
+293	        addAssistantMsg('Something went wrong. Please try again.');
+294	      }
+295	      document.getElementById('sendBtn').disabled = false;
+296	      input.focus();
+297	    }
+298	
+299	    function addUserMsg(text) {
+300	      const div = document.createElement('div');
+301	      div.className = 'msg user';
+302	      div.innerHTML = `<div class="bubble">${text}</div>`;
+303	      document.getElementById('messages').appendChild(div);
+304	      scrollBottom();
+305	    }
+306	
+307	    function addAssistantMsg(text) {
+308	      const div = document.createElement('div');
+309	      div.className = 'msg assistant';
+310	      div.innerHTML = `<div class="bubble">${text}</div>`;
+311	      document.getElementById('messages').appendChild(div);
+312	      scrollBottom();
+313	    }
+314	
+315	    function addThinking() {
+316	      const div = document.createElement('div');
+317	      div.className = 'msg assistant';
+318	      div.innerHTML = '<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+319	      document.getElementById('messages').appendChild(div);
+320	      scrollBottom();
+321	      return div;
+322	    }
+323	
+324	    function renderResponse(question, data) {
+325	      if (data.error) { addAssistantMsg(`Error: ${data.error}`); return; }
+326	
+327	      const div = document.createElement('div');
+328	      div.className = 'msg assistant';
+329	      let html = '';
+330	
+331	      if (data.answer) html += `<div class="bubble">${data.answer}</div>`;
+332	
+333	      const hasChart = data.chart?.type;
+334	      const hasTable = data.table?.headers;
+335	      const chartId = 'c' + Math.random().toString(36).slice(2);
+336	
+337	      if (hasChart) {
+338	        html += `<div class="chart-wrap"><div class="chart-title">${data.chart.title || ''}</div><canvas id="${chartId}"></canvas></div>`;
+339	      }
+340	
+341	      if (hasTable) {
+342	        html += `<div class="table-wrap"><table>
+343	          <thead><tr>${data.table.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+344	          <tbody>${data.table.rows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+345	        </table></div>`;
+346	      }
+347	
+348	      const storeKey = 'r' + Math.random().toString(36).slice(2);
+349	      responseStore[storeKey] = data;
+350	      const saveId = 'save_' + Math.random().toString(36).slice(2);
+351	      html += `<div class="msg-actions">
+352	        <button class="action-btn" id="${saveId}" onclick="openSaveModal(this, '${question.replace(/'/g,"\\'")}', '${storeKey}')">💾 Save</button>
+353	        ${hasTable ? `<button class="action-btn csv" onclick="exportCSV('${storeKey}')">⬇ Export CSV</button>` : ''}
+354	      </div>`;
+355	
+356	      div.innerHTML = html;
+357	      document.getElementById('messages').appendChild(div);
+358	      scrollBottom();
+359	
+360	      if (hasChart) {
+361	        const colors = ['#f5a623','#60a5fa','#4ade80','#f87171','#c084fc','#2dd4bf','#fb923c','#a78bfa'];
+362	        if (charts[chartId]) charts[chartId].destroy();
+363	        charts[chartId] = new Chart(document.getElementById(chartId), {
+364	          type: data.chart.type,
+365	          data: {
+366	            labels: data.chart.labels,
+367	            datasets: [{ data: data.chart.values, backgroundColor: colors, borderColor: data.chart.type === 'line' ? '#f5a623' : colors, borderWidth: data.chart.type === 'line' ? 2 : 1, tension: 0.4, fill: false }]
+368	          },
+369	          options: {
+370	            responsive: true,
+371	            plugins: { legend: { display: data.chart.type === 'pie', labels: { color: '#888' } } },
+372	            scales: data.chart.type !== 'pie' ? { x: { ticks: { color: '#888' }, grid: { color: '#1a1a1a' } }, y: { ticks: { color: '#888' }, grid: { color: '#1a1a1a' } } } : {}
+373	          }
+374	        });
+375	      }
+376	    }
+377	
+378	    function exportCSV(storeKey) {
+379	      const table = responseStore[storeKey]?.table;
+380	      if (!table) return;
+381	      const rows = [table.headers, ...table.rows];
+382	      const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+383	      const blob = new Blob([csv], { type: 'text/csv' });
+384	      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+385	      a.download = `insight_${Date.now()}.csv`; a.click();
+386	    }
+387	
+388	    let savePayload = null;
+389	    function openSaveModal(btn, question, storeKey) {
+390	      savePayload = { btn, question, data: responseStore[storeKey] };
+391	      document.getElementById('insightTitle').value = question.slice(0, 60);
+392	      document.getElementById('modalOverlay').classList.add('open');
+393	      setTimeout(() => document.getElementById('insightTitle').select(), 50);
+394	    }
+395	    document.getElementById('modalCancel').addEventListener('click', () => {
+396	      document.getElementById('modalOverlay').classList.remove('open'); savePayload = null;
+397	    });
+398	    document.getElementById('modalSave').addEventListener('click', async () => {
+399	      const title = document.getElementById('insightTitle').value.trim();
+400	      if (!title || !savePayload) return;
+401	      const { btn, question, data } = savePayload;
+402	      const names = [...selectedIds].map(id => allFiles.find(f => f.id === id)?.name).filter(Boolean);
+403	      await sb.from('saved_insights').insert({
+404	        title, question,
+405	        answer: data.answer || null,
+406	        chart: data.chart || null,
+407	        table_data: data.table || null,
+408	        document_ids: [...selectedIds],
+409	        document_names: names,
+410	        project_id: projectId || null
+411	      });
+412	      btn.textContent = '✓ Saved'; btn.classList.add('saved'); btn.onclick = null;
+413	      document.getElementById('modalOverlay').classList.remove('open');
+414	      savePayload = null;
+415	      await loadInsights();
+416	    });
+417	
+418	    document.getElementById('insightsBtn').addEventListener('click', () => {
+419	      document.getElementById('insightsPanel').classList.add('open');
+420	      document.getElementById('panelOverlay').classList.add('open');
+421	    });
+422	    document.getElementById('panelClose').addEventListener('click', closePanel);
+423	    document.getElementById('panelOverlay').addEventListener('click', closePanel);
+424	    function closePanel() {
+425	      document.getElementById('insightsPanel').classList.remove('open');
+426	      document.getElementById('panelOverlay').classList.remove('open');
+427	    }
+428	
+429	    async function loadInsights() {
+430	      let query = sb.from('saved_insights').select('*').order('created_at', { ascending: false });
+431	      if (projectId) query = query.eq('project_id', projectId);
+432	      const { data } = await query;
+433	      const body = document.getElementById('panelBody');
+434	      if (!data?.length) { body.innerHTML = '<div class="panel-empty">No saved insights yet.<br>Save a response using the 💾 button.</div>'; return; }
+435	      body.innerHTML = data.map(ins => `
+436	        <div class="insight-card" onclick="replayInsight(${JSON.stringify(JSON.stringify(ins))})">
+437	          <div class="insight-title">${ins.title}</div>
+438	          <div class="insight-q">${ins.question}</div>
+439	          <div class="insight-meta">
+440	            <span>${ins.document_names?.join(' + ') || ''}</span>
+441	            <div style="display:flex;align-items:center;gap:6px">
+442	              <span>${new Date(ins.created_at).toLocaleDateString()}</span>
+443	              <button class="insight-del" onclick="event.stopPropagation();deleteInsight('${ins.id}')">×</button>
+444	            </div>
+445	          </div>
+446	        </div>`).join('');
+447	    }
+448	
+449	    function replayInsight(insJson) {
+450	      const ins = JSON.parse(insJson);
+451	      closePanel();
+452	      document.getElementById('messages').innerHTML = '';
+453	      addUserMsg(ins.question);
+454	      renderResponse(ins.question, { answer: ins.answer, chart: ins.chart, table: ins.table_data });
+455	    }
+456	
+457	    async function deleteInsight(id) {
+458	      await sb.from('saved_insights').delete().eq('id', id);
+459	      await loadInsights();
+460	    }
+461	
+462	    function scrollBottom() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
+463	  </script>
+464	</body>
+465	</html>
+466
