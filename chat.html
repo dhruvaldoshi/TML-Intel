@@ -188,6 +188,8 @@
 
     // Pre-select from URL param
     const urlDoc = new URLSearchParams(location.search).get('doc');
+const projectId = new URLSearchParams(location.search).get('project');
+
     if (urlDoc) selectedIds.add(urlDoc);
 
     // Auth
@@ -207,7 +209,10 @@
 
     // Load processed files
     async function loadFiles() {
-      const { data } = await sb.from('documents').select('id, name').eq('status', 'processed').order('created_at', { ascending: false });
+      const query = sb.from('documents').select('id, name').eq('status', 'processed').order('created_at', { ascending: false });
+if (projectId) query.eq('project_id', projectId);
+const { data } = await query;
+
       allFiles = data || [];
       renderPickerList();
     }
