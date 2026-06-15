@@ -1,35 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TML Intel — Upload</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="<https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js>"></script>  
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #080808; color: #ece8df; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; min-height: 100vh; padding: 40px 20px; }
     .container { max-width: 800px; margin: 0 auto; }
-    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
-    h1 { font-size: 22px; font-weight: 600; }
-    .nav { display: flex; gap: 8px; }
-    .nav a { color: #888; font-size: 13px; text-decoration: none; padding: 5px 12px; border: 1px solid #222; border-radius: 6px; }
-    .nav a.active, .nav a:hover { color: #f5a623; border-color: #f5a623; }
+    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
+    .back { color: #888; font-size: 13px; text-decoration: none; padding: 5px 10px; border: 1px solid #222; border-radius: 6px; }
+    .back:hover { color: #f5a623; border-color: #f5a623; }
+    h1 { font-size: 20px; font-weight: 700; }
+    .project-badge { background: #1a1200; border: 1px solid #f5a623; color: #f5a623; font-size: 12px; padding: 3px 10px; border-radius: 20px; }
+    .nav a { color: #888; font-size: 13px; text-decoration: none; padding: 5px 10px; border: 1px solid #222; border-radius: 6px; }
+    .nav a:hover { color: #f5a623; border-color: #f5a623; }
     .logout { margin-left: auto; background: none; border: 1px solid #222; color: #888; font-size: 13px; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
     .logout:hover { border-color: #f87171; color: #f87171; }
-    .dropzone { border: 2px dashed #333; border-radius: 16px; padding: 60px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0d0d0d; position: relative; }
+    .dropzone { border: 2px dashed #333; border-radius: 16px; padding: 50px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0d0d0d; position: relative; }
     .dropzone:hover, .dropzone.drag-over { border-color: #f5a623; background: #111; }
     .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-    .drop-icon { font-size: 48px; margin-bottom: 16px; }
-    .drop-title { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+    .drop-icon { font-size: 40px; margin-bottom: 12px; }
+    .drop-title { font-size: 17px; font-weight: 500; margin-bottom: 6px; }
     .drop-subtitle { color: #888; font-size: 13px; }
-    .file-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
-    .file-type-tag { background: #1a1a1a; border: 1px solid #222; border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #888; }
-    .section-title { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 32px 0 12px; }
+    .file-types { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+    .file-type-tag { background: #1a1a1a; border: 1px solid #222; border-radius: 20px; padding: 3px 10px; font-size: 11px; color: #888; }
+    .section-title { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 28px 0 10px; }
     .file-list { display: flex; flex-direction: column; gap: 8px; }
-    .file-item, .uploaded-item { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
-    .file-icon { font-size: 24px; flex-shrink: 0; }
+    .file-item, .uploaded-item { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+    .file-icon { font-size: 22px; flex-shrink: 0; }
     .file-info, .uploaded-info { flex: 1; min-width: 0; }
     .file-name, .uploaded-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .file-meta, .uploaded-meta { font-size: 12px; color: #888; margin-top: 2px; }
@@ -38,11 +40,11 @@
     .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
     .badge-processed { background: #052e16; color: #4ade80; border: 1px solid #166534; }
     .badge-uploaded { background: #1c1917; color: #888; border: 1px solid #333; }
-    .progress-bar { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .progress-bar { height: 3px; background: #1a1a1a; border-radius: 2px; margin-top: 6px; overflow: hidden; }
     .progress-fill { height: 100%; background: #f5a623; border-radius: 2px; transition: width 0.3s; }
     .remove-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 18px; padding: 4px; }
     .remove-btn:hover { color: #f87171; }
-    .upload-btn { display: block; width: 100%; margin-top: 16px; padding: 14px; background: #f5a623; color: #080808; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .upload-btn { display: block; width: 100%; margin-top: 14px; padding: 13px; background: #f5a623; color: #080808; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
     .upload-btn:hover { opacity: 0.9; } .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .chat-btn { background: none; border: 1px solid #222; color: #888; cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; text-decoration: none; }
     .chat-btn:hover { border-color: #4ade80; color: #4ade80; }
@@ -58,73 +60,77 @@
 <body>
   <div class="container">
     <div class="header">
+      <a href="index.html" class="back">← Projects</a>
       <h1>TML Intel</h1>
-      <nav class="nav">
-        <a href="upload.html" class="active">Upload</a>
-        <a href="chat.html">Chat with Data</a>
+      <span class="project-badge" id="projectBadge">Loading…</span>
+      <nav class="nav" id="chatNav" style="display:none">
+        <a href="#" id="chatLink">Chat with Data</a>
       </nav>
       <button class="logout" id="logoutBtn">Sign out</button>
     </div>
-    <div id="authMsg" style="display:none; text-align:center; padding:60px; color:#888;">Checking access…</div>
-    <div id="mainContent" style="display:none">
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="fileInput" multiple accept=".csv,.xls,.xlsx" />
-        <div class="drop-icon">📂</div>
-        <div class="drop-title">Drop CSV or Excel files here</div>
-        <div class="drop-subtitle">Click to browse · Multiple files supported</div>
-        <div class="file-types">
-          <span class="file-type-tag">CSV</span>
-          <span class="file-type-tag">Excel (.xlsx)</span>
-          <span class="file-type-tag">Excel (.xls)</span>
-        </div>
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" multiple accept=".csv,.xls,.xlsx,.pdf" />
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop files here to upload</div>
+      <div class="drop-subtitle">Click to browse · Multiple files supported</div>
+      <div class="file-types">
+        <span class="file-type-tag">CSV</span>
+        <span class="file-type-tag">Excel (.xlsx)</span>
+        <span class="file-type-tag">Excel (.xls)</span>
+        <span class="file-type-tag">PDF</span>
       </div>
-      <div id="queueSection" style="display:none">
-        <div class="section-title">Ready to upload</div>
-        <div class="file-list" id="queue"></div>
-        <button class="upload-btn" id="uploadBtn">Upload & Process Files</button>
-      </div>
-      <div class="section-title">Your files</div>
-      <div class="file-list" id="uploadedList">
-        <div class="empty">No files uploaded yet</div>
-      </div>
+    </div>
+
+    <div id="queueSection" style="display:none">
+      <div class="section-title">Ready to upload</div>
+      <div class="file-list" id="queue"></div>
+      <button class="upload-btn" id="uploadBtn">Upload & Process Files</button>
+    </div>
+
+    <div class="section-title">Files in this project</div>
+    <div class="file-list" id="uploadedList">
+      <div class="empty">No files uploaded yet</div>
     </div>
   </div>
   <div class="toast" id="toast"></div>
 
   <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const SUPABASE_URL = 'https://hwceecnfjvbscosyknyg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
     const { createClient } = window.supabase;
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let token = null;
+    const projectId = new URLSearchParams(location.search).get('project');
     let queue = [];
-
-    document.getElementById('authMsg').style.display = 'block';
 
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
-      document.getElementById('authMsg').style.display = 'none';
       if (!session) { window.location.replace('login.html'); return; }
-      token = session.access_token;
-      document.getElementById('mainContent').style.display = 'block';
+      if (!projectId) { window.location.replace('index.html'); return; }
+      const { data: proj } = await sb.from('projects').select('name').eq('id', projectId).single();
+      if (!proj) { window.location.replace('index.html'); return; }
+      document.getElementById('projectBadge').textContent = proj.name;
+      document.getElementById('chatLink').href = `chat.html?project=${projectId}`;
+      document.getElementById('chatNav').style.display = 'flex';
       loadUploaded();
     })();
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await sb.auth.signOut();
-      window.location.replace('login.html');
+      await sb.auth.signOut(); window.location.replace('login.html');
     });
 
     function getIcon(name) {
       const ext = name.split('.').pop().toLowerCase();
-      return { csv: '📊', xlsx: '📗', xls: '📗' }[ext] || '📁';
+      return { csv: '📊', xlsx: '📗', xls: '📗', pdf: '📄' }[ext] || '📁';
     }
     function formatSize(b) { return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
     function showToast(msg, type = 'success') {
       const t = document.getElementById('toast');
       t.textContent = msg; t.className = `toast show ${type}`;
-      setTimeout(() => t.className = 'toast', 3000);
+      setTimeout(() => t.className = 'toast', 3500);
     }
 
     const dropzone = document.getElementById('dropzone');
@@ -132,7 +138,7 @@
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
     dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag-over'); addToQueue([...e.dataTransfer.files]); });
-    fileInput.addEventListener('change', () => addToQueue([...fileInput.files]));
+    fileInput.addEventListener('change', () => { addToQueue([...fileInput.files]); fileInput.value = ''; });
 
     function addToQueue(files) {
       files.forEach(f => {
@@ -161,50 +167,108 @@
 
     function removeItem(id) { queue = queue.filter(q => q.id !== id); renderQueue(); }
 
-document.getElementById('uploadBtn').addEventListener('click', async () => {
-  document.getElementById('uploadBtn').disabled = true;
-  for (const item of queue.filter(q => q.status === 'pending')) {
-    item.status = 'uploading'; item.progress = 20; renderQueue();
-
-    // Convert Excel to CSV in browser before uploading
-    let uploadFile = item.file;
-    let uploadName = item.file.name;
-    if (/\.(xlsx|xls)$/i.test(item.file.name)) {
-      const buffer = await item.file.arrayBuffer();
-      const workbook = XLSX.read(buffer);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const csv = XLSX.utils.sheet_to_csv(sheet);
-      uploadName = item.file.name.replace(/\.(xlsx|xls)$/i, '.csv');
-      uploadFile = new File([new Blob([csv], { type: 'text/csv' })], uploadName, { type: 'text/csv' });
+    async function extractPDFPages(file) {
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      const pages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const text = content.items.map(item => item.str).join(' ').trim();
+        if (text) pages.push({ page: i, content: text });
+      }
+      return pages;
     }
 
-    const path = `${Date.now()}_${uploadName}`;
-    const { error: upErr } = await sb.storage.from('documents').upload(path, uploadFile);
-    if (upErr) { item.status = 'error'; renderQueue(); showToast(`Failed: ${item.file.name}`, 'error'); continue; }
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      document.getElementById('uploadBtn').disabled = true;
+      const { data: { session } } = await sb.auth.getSession();
 
-    item.progress = 50; renderQueue();
-    const { data: { session: s } } = await sb.auth.getSession();
-    const { data: doc } = await sb.from('documents').insert({
-      name: item.file.name, type: 'text/csv', size: uploadFile.size, storage_path: path, source: 'upload'
-    }).select().single();
+      for (const item of queue.filter(q => q.status === 'pending')) {
+        const isPDF = /\.pdf$/i.test(item.file.name);
+        const isExcel = /\.(xlsx|xls)$/i.test(item.file.name);
+        item.status = 'uploading'; item.progress = 15; renderQueue();
 
-    item.status = 'processing'; item.progress = 70; renderQueue();
-    await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${s?.access_token}` },
-      body: JSON.stringify({ document_id: doc.id })
+        try {
+          let uploadFile = item.file;
+          let uploadName = item.file.name;
+
+          // Convert Excel to CSV in browser
+          if (isExcel) {
+            const buffer = await item.file.arrayBuffer();
+            const workbook = XLSX.read(buffer);
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const csv = XLSX.utils.sheet_to_csv(sheet);
+            uploadName = item.file.name.replace(/\.(xlsx|xls)$/i, '.csv');
+            uploadFile = new File([new Blob([csv], { type: 'text/csv' })], uploadName, { type: 'text/csv' });
+          }
+
+          // Upload file to storage
+          const path = `${Date.now()}_${uploadName}`;
+          const { error: upErr } = await sb.storage.from('documents').upload(path, uploadFile);
+          if (upErr) throw new Error(upErr.message);
+
+          item.progress = 40; renderQueue();
+
+          // Create document record
+          const { data: doc, error: docErr } = await sb.from('documents').insert({
+            name: item.file.name,
+            type: isPDF ? 'application/pdf' : 'text/csv',
+            size: uploadFile.size,
+            storage_path: path,
+            source: 'upload',
+            project_id: projectId
+          }).select().single();
+          if (docErr) throw new Error(docErr.message);
+
+          item.status = 'processing'; item.progress = 60; renderQueue();
+
+          if (isPDF) {
+            // Extract text from PDF in browser and store directly
+            const pages = await extractPDFPages(item.file);
+            if (!pages.length) throw new Error('No text found in PDF');
+
+            await sb.from('data_columns').insert([
+              { document_id: doc.id, column_name: 'page', column_type: 'number' },
+              { document_id: doc.id, column_name: 'content', column_type: 'text' }
+            ]);
+
+            const BATCH = 20;
+            for (let i = 0; i < pages.length; i += BATCH) {
+              await sb.from('data_rows').insert(
+                pages.slice(i, i + BATCH).map((p, idx) => ({
+                  document_id: doc.id,
+                  row_number: i + idx + 1,
+                  row_data: p
+                }))
+              );
+            }
+            await sb.from('documents').update({ status: 'processed' }).eq('id', doc.id);
+          } else {
+            // Process CSV via edge function
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/process-file`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session?.access_token}` },
+              body: JSON.stringify({ document_id: doc.id })
+            });
+            const result = await res.json();
+            if (result.error) throw new Error(result.error);
+          }
+
+          item.status = 'done'; item.progress = 100; renderQueue();
+          showToast(`Ready: ${item.file.name}`);
+        } catch(err) {
+          item.status = 'error'; renderQueue();
+          showToast(`Failed: ${item.file.name} — ${err.message}`, 'error');
+        }
+      }
+
+      setTimeout(() => { queue = queue.filter(q => q.status !== 'done'); renderQueue(); loadUploaded(); }, 1500);
+      document.getElementById('uploadBtn').disabled = false;
     });
 
-    item.status = 'done'; item.progress = 100; renderQueue();
-    showToast(`Ready: ${item.file.name}`);
-  }
-  setTimeout(() => { queue = queue.filter(q => q.status !== 'done'); renderQueue(); loadUploaded(); }, 1500);
-  document.getElementById('uploadBtn').disabled = false;
-  fileInput.value = '';
-});
-
     async function loadUploaded() {
-      const { data } = await sb.from('documents').select('*').order('created_at', { ascending: false });
+      const { data } = await sb.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
       const ul = document.getElementById('uploadedList');
       if (!data?.length) { ul.innerHTML = '<div class="empty">No files uploaded yet</div>'; return; }
       ul.innerHTML = data.map(doc => `
@@ -215,7 +279,7 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
             <div class="uploaded-meta">${formatSize(doc.size)} · ${new Date(doc.created_at).toLocaleDateString()}</div>
           </div>
           <span class="badge badge-${doc.status === 'processed' ? 'processed' : 'uploaded'}">${doc.status}</span>
-          ${doc.status === 'processed' ? `<a class="chat-btn" href="chat.html?doc=${doc.id}">Chat →</a>` : ''}
+          ${doc.status === 'processed' ? `<a class="chat-btn" href="chat.html?project=${projectId}&doc=${doc.id}">Chat →</a>` : ''}
           <button class="delete-btn" onclick="deleteDoc('${doc.id}','${doc.storage_path}')">Delete</button>
         </div>`).join('');
     }
