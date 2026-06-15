@@ -44,7 +44,8 @@
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) window.location.replace('upload.html');
+      if (session) window.location.replace('index.html');
+
     });
 
     const btn = document.getElementById('btn');
@@ -65,7 +66,8 @@
         btn.disabled = false;
         btn.textContent = 'Sign in';
       } else {
-        window.location.replace('upload.html');
+        window.location.replace('index.html');
+
       }
     });
   </script>
