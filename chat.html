@@ -190,7 +190,12 @@
       token = session.access_token;
       await loadFiles();
       await loadInsights();
-      if (selectedIds.size) { renderTags(); enableChat(); showWelcomeForFiles(); }
+      if (selectedIds.size) {
+        renderTags();
+        enableChat();
+        showWelcomeForFiles();
+        document.getElementById('joinHint').style.display = selectedIds.size > 1 ? 'block' : 'none';
+      }
     })();
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -202,6 +207,7 @@
       if (projectId) query = query.eq('project_id', projectId);
       const { data } = await query;
       allFiles = data || [];
+      allFiles.forEach(f => selectedIds.add(f.id));
       renderPickerList();
     }
 
