@@ -282,6 +282,9 @@
       const thinking = addThinking();
 
       try {
+        const { data: { session: fresh } } = await sb.auth.getSession();
+        if (!fresh) { window.location.replace('login.html'); return; }
+        token = fresh.access_token;
         const res = await fetch(`${SUPABASE_URL}/functions/v1/query-data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` },
