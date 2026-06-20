@@ -36,22 +36,27 @@
     <div class="msg" id="msg"></div>
     <div class="notice">Access is by invitation only</div>
   </div>
+
   <script>
     const SUPABASE_URL = 'https://hwceecnfjvbscosyknyg.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3Y2VlY25manZic2Nvc3lrbnlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwOTkxMDIsImV4cCI6MjA5MDY3NTEwMn0.wYu4HGnpPlH4Iecht57kgv2I7YJQb_UpFsuA6C7vnnw';
     const { createClient } = window.supabase;
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     sb.auth.getSession().then(({ data: { session } }) => {
       if (session) window.location.replace('index.html');
     });
+
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
+
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       btn.disabled = true;
       btn.textContent = 'Signing in…';
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
+
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) {
         msg.textContent = 'Invalid email or password.';
